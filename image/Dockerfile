@@ -1,7 +1,7 @@
 FROM rust:1.77-slim-bookworm AS build
 
-ARG recorder=ade66ab9426e001b3c4d9a7b0af124baef6526da
-ARG converter=89c957608f44d3450335120f89222ac138929f91
+ARG recorder
+ARG converter
 
 RUN cargo install --git https://github.com/asciinema/asciinema --rev $recorder
 RUN cargo install --git https://github.com/asciinema/agg --rev $converter

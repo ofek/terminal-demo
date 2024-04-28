@@ -1,0 +1,13 @@
+name: Publish local changes
+
+on:
+  push:
+    branches:
+    - master
+    paths:
+    - image/**
+
+jobs:
+  build:
+    uses: ./.github/workflows/publish.yml
+    secrets: inherit

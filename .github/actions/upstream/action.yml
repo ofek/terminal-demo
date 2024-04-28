@@ -1,0 +1,36 @@
+name: Upstream
+description: Get the latest commits of the upstream repositories
+outputs:
+  recorder-rev:
+    value: ${{ steps.recorder.outputs.rev }}
+  recorder-short-rev:
+    value: ${{ steps.recorder.outputs.short-rev }}
+  converter-rev:
+    value: ${{ steps.converter.outputs.rev }}
+  converter-short-rev:
+    value: ${{ steps.converter.outputs.short-rev }}
+
+runs:
+  using: composite
+  steps:
+  - name: Inspect recorder
+    id: recorder
+    env:
+      GH_TOKEN: ${{ github.token }}
+    shell: bash
+    run: |-
+      rev=$(gh api repos/asciinema/asciinema/commits/develop --jq '.sha')
+      short=${rev:0:7}
+      echo "rev=$rev" >> $GITHUB_OUTPUT
+      echo "short-rev=$short" >> $GITHUB_OUTPUT
+
+  - name: Inspect converter
+    id: converter
+    env:
+      GH_TOKEN: ${{ github.token }}
+    shell: bash
+    run: |-
+      rev=$(gh api repos/asciinema/agg/commits/main --jq '.sha')
+      short=${rev:0:7}
+      echo "rev=$rev" >> $GITHUB_OUTPUT
+      echo "short-rev=$short" >> $GITHUB_OUTPUT
