@@ -1,10 +1,10 @@
 # terminal-demo
 
-Produce GIFs from shell commands.
+Produce GIFs from shell commands using [asciinema](https://github.com/asciinema/asciinema) and [agg](https://github.com/asciinema/agg).
 
 ## Image creation
 
-Make sure the `terminal-demo` layer comes last in the Dockerfile.
+Create your own Dockerfile, for example:
 
 ```dockerfile
 # Preferably set up your environment in a separate layer
@@ -36,9 +36,14 @@ FROM ofekmeister/terminal-demo
 COPY --from=setup /script.sh /script.sh
 ```
 
+Then build the image:
+
 ```console
 $ docker build . -t demo
 ```
+
+> [!TIP]
+> Although it's recommended to use `ofekmeister/terminal-demo` as the final layer, the image is based on [buildpack-deps](https://hub.docker.com/_/buildpack-deps) so if you want to use it directly as the base layer it should already contain most of the necessary tools and development headers.
 
 ## Usage
 
@@ -56,3 +61,11 @@ $ docker run --rm -v $(pwd):/record demo
 ```
 
 <img src="https://raw.githubusercontent.com/ofek/terminal-demo/master/example.gif" alt="Example recording" role="img">
+
+## Options
+
+The image entrypoint is a script that will forward all arguments to [agg](https://github.com/asciinema/agg). For example, to see the available options run:
+
+```console
+$ docker run --rm -v $(pwd):/record demo --help
+```
