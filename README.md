@@ -30,10 +30,14 @@ EOF
 EOL
 RUN chmod +x /script.sh
 
-FROM terminal-demo
+FROM ofekmeister/terminal-demo
 
 # Then copy what is necessary from previous layers
 COPY --from=setup /script.sh /script.sh
+```
+
+```console
+$ docker build . -t demo
 ```
 
 ## Usage
@@ -48,7 +52,7 @@ You'll need to mount a directory to `/record` in the container that contains a f
 The serialized recording and output GIF will be saved in this directory as well.
 
 ```console
-$ docker run --rm -v $(pwd):/record terminal-demo
+$ docker run --rm -v $(pwd):/record demo
 ```
 
 <img src="https://raw.githubusercontent.com/ofek/terminal-demo/master/example.gif" alt="Example recording" role="img">
