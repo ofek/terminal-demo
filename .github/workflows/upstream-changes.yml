@@ -34,3 +34,4 @@ jobs:
     needs: check
     if: needs.check.outputs.changes == 'true'
     uses: ./.github/workflows/publish.yml
+    secrets: inherit
