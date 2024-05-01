@@ -11,6 +11,7 @@ Produce GIFs from shell commands using [asciinema](https://github.com/asciinema/
   - [Commands](#commands)
   - [Prompt](#prompt)
 - [Fonts](#fonts)
+- [Troubleshooting](#troubleshooting)
 
 ## Image creation
 
@@ -139,3 +140,7 @@ The image provides the following fonts that you can use in the `--font-family` [
 - `JetBrainsMono NF` from Nerd Fonts [v3.2.1](https://github.com/ryanoasis/nerd-fonts/releases/tag/v3.2.1)
 
 [Monochrome-only](https://github.com/asciinema/agg/tree/89c957608f44d3450335120f89222ac138929f91#emoji) emoji support comes from Google's Noto Emoji [v15.1](https://github.com/googlefonts/noto-emoji/releases/tag/v2.042).
+
+## Troubleshooting
+
+If you encounter unexpected or lack of output for the first command prompt, try re-running. This is a known issue but rare enough that I've been unable to reproduce it for debugging.
