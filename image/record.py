@@ -5,26 +5,43 @@ import os
 import re
 import sys
 import time
+from pathlib import Path
 
 import pexpect
 
-COMMANDS_FILE = '/record/commands.txt'
-RECORDING_FILE = '/record/record.cast'
-OUTPUT_FILE = '/record/record.gif'
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
+
+HOME_DIR = Path.home()
+DATA_DIR = Path('/record')
+CONFIG_FILE = DATA_DIR / 'config.toml'
+RECORDING_FILE = DATA_DIR / 'record.cast'
+OUTPUT_FILE = DATA_DIR / 'record.gif'
+
+# Ensure that the shell exits if any command fails
 SETUP_COMMAND = 'set -e'
-PROMPT = b'\x1b[0;32m\xe2\x9d\xaf \x1b[0m'
+
+# This appears to be the lowest perceptible keypress delay, any lower doesn't seem to have any effect
+DEFAULT_KEYPRESS_DELAY = 0.03
+
+# The time to wait after typing the final character in a command
+DEFAULT_COMMAND_WAIT_WITH_KEYPRESS_DELAY = 0.1
+DEFAULT_COMMAND_WAIT_WITHOUT_KEYPRESS_DELAY = 0.25
+
+# https://gist.github.com/fnky/458719343aabd01cfb17a3a4f7296797
+# The user types: \u001b
+# We get: \x1b
+# Bash requires: \e
+DEFAULT_PROMPT = '\x1b[0;32m❯ \x1b[0m'
+BASH_PROMPT_REPLACEMENTS = {'\x1b': '\\e'}
 
 
 def main():
     args = sys.argv[1:]
     if '-h' in args or '--help' in args:
         return os.execvp('agg', ['agg', '--help'])
-
-    shell_commands = []
-    with open(COMMANDS_FILE, 'r', encoding='utf-8') as f:
-        for line in f:
-            if line.strip():
-                shell_commands.append(line.rstrip())
 
     env_vars = dict(os.environ)
     for arg, env_var, default in (('--rows', 'LINES', 24), ('--cols', 'COLUMNS', 80)):
@@ -34,74 +51,89 @@ def main():
             value = os.getenv(env_var, default)
         env_vars[env_var] = str(value)
 
+    with CONFIG_FILE.open(encoding='utf-8') as f:
+        config = tomllib.loads(f.read())
+
+    prompt = bash_prompt = config.get('prompt', DEFAULT_PROMPT)
+    for seq, replacement in BASH_PROMPT_REPLACEMENTS.items():
+        bash_prompt = bash_prompt.replace(seq, replacement)
+
+    with (HOME_DIR / '.bashrc').open('a', encoding='utf-8') as f:
+        f.write(f'\nPS1="{bash_prompt}"\n')
+
     shell = pexpect.spawn(
         'asciinema',
-        ['rec', RECORDING_FILE, '--overwrite', '-c', os.environ['SHELL']],
+        ['rec', str(RECORDING_FILE), '--overwrite', '-c', os.environ['SHELL']],
         env=env_vars,
         timeout=None,
     )
     shell.setwinsize(int(env_vars['LINES']), int(env_vars['COLUMNS']))
 
-    prompt_pattern = re.escape(PROMPT.decode('utf-8')).encode('utf-8')
+    prompt_pattern = re.compile(config.get('prompt-pattern') or re.escape(prompt))
     shell.expect(prompt_pattern)
+
+    # Set up the shell
     shell.sendline(SETUP_COMMAND)
+    time.sleep(DEFAULT_COMMAND_WAIT_WITHOUT_KEYPRESS_DELAY)
     shell.expect(prompt_pattern)
 
-    num_commands = len(shell_commands)
-    inside_command = False
-    for i, shell_command in enumerate(shell_commands, 1):
-        # Best effort attempt at detecting multi-line commands
-        continuation_line = (
-            # Explicit continuation line
-            shell_command.endswith('\\')
-            # Next line starts with a space
-            or (i != num_commands and shell_commands[i].startswith(' '))
-        )
-        if continuation_line or inside_command:
-            print(shell_command)
+    # Allow for a multi-line string or an array of command structures
+    commands = (
+        [{'text': commands} for commands in config['commands'].splitlines()]
+        if 'commands' in config
+        else config['command']
+    )
+    error = False
+    for command in commands:
+        text = command['text'].strip()
+        delay = float(command.get('delay', DEFAULT_KEYPRESS_DELAY))
+        if delay:
+            for char in text:
+                print(char, end='')
+                shell.send(char.encode('utf-8'))
+                time.sleep(delay)
+
+            wait = float(command.get('wait', DEFAULT_COMMAND_WAIT_WITH_KEYPRESS_DELAY))
         else:
-            print(f'{shell_command} ... ', end='', flush=True)
+            print(text, end='')
+            shell.send(text.encode('utf-8'))
+            wait = float(command.get('wait', DEFAULT_COMMAND_WAIT_WITHOUT_KEYPRESS_DELAY))
 
-        for char in shell_command:
-            shell.send(char.encode('utf-8'))
-            time.sleep(0.03)
-
+        print()
         shell.send(b'\n')
-        time.sleep(0.05)
-
-        if continuation_line:
-            inside_command = True
-            continue
+        time.sleep(wait)
 
         try:
             shell.expect(prompt_pattern)
         except pexpect.EOF:
-            print('Shell closed unexpectedly')
-            return 1
-
-        if not inside_command:
-            print('done')
-
-        inside_command = False
+            error = True
+            print('Shell exited unexpectedly')
+            break
 
     shell.close()
 
-    with open(RECORDING_FILE, 'r', encoding='utf-8') as f:
+    with RECORDING_FILE.open(encoding='utf-8') as f:
         recording_lines = f.readlines()
 
     for i, line in enumerate(recording_lines[1:], 1):
-        _, _, text = json.loads(line)
-        if text.startswith(SETUP_COMMAND):
+        _, _, contents = json.loads(line)
+        if contents.startswith(SETUP_COMMAND):
             # Remove setup command and prompt
             for _ in range(2):
                 del recording_lines[i]
 
             break
 
-    with open(RECORDING_FILE, 'w', encoding='utf-8') as f:
+    with RECORDING_FILE.open('w', encoding='utf-8') as f:
         f.writelines(recording_lines)
 
-    return os.execvp('agg', ['agg', RECORDING_FILE, OUTPUT_FILE, *args])
+    if not error:
+        return os.execvp('agg', ['agg', str(RECORDING_FILE), str(OUTPUT_FILE), *args])
+
+    import subprocess
+
+    subprocess.run(['agg', str(RECORDING_FILE), str(OUTPUT_FILE), *args])
+    return 1
 
 
 if __name__ == '__main__':
