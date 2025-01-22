@@ -1,4 +1,4 @@
-FROM rust:1.77-slim-bookworm AS build
+FROM rust:1.84-slim-bookworm AS build
 
 ARG recorder
 ARG converter
